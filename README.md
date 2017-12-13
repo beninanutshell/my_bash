@@ -4,4 +4,4 @@
   cd ~/
   mv .bashrc .bashrc.bak
   ln -s ~/.bash/init ~/.bashrc
-  source ~/.bahrc
+  source ~/.bashrc
