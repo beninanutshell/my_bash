@@ -1,0 +1,264 @@
+# FUNCTIONS {{{
+
+# top des commandes de l'historique {{{
+top10() { history | awk '{a[$2]++ } END{for(i in a){print a[i] " " i}}' | sort -rn | head; }
+#}}}
+
+# UP {{{
+# on revient en arrière 
+up() {
+  local d=""
+  limit=$1
+  for ((i=1 ; i <= limit ; i++)); do
+    d=$d/..
+  done
+  d=$(echo $d | sed 's/^\///')
+  if [[ -z "$d" ]]; then
+    d=..
+  fi
+  cd $d
+}
+#}}}
+
+# on extract n'importe quel type d'archive {{{
+extract() {
+  clrstart="\033[1;34m"  #color codes
+  clrend="\033[0m"
+
+  if [[ "$#" -lt 1 ]]; then
+    echo -e "${clrstart}Pass a filename. Optionally a destination folder. You can also append a v for verbose output.${clrend}"
+    exit 1 #not enough args
+  fi
+
+  if [[ ! -e "$1" ]]; then
+    echo -e "${clrstart}File does not exist!${clrend}"
+    exit 2 #file not found
+  fi
+
+  if [[ -z "$2" ]]; then
+    DESTDIR="." #set destdir to current dir
+  elif [[ ! -d "$2" ]]; then
+    echo -e -n "${clrstart}Destination folder doesn't exist or isnt a directory. Create? (y/n): ${clrend}"
+    read response
+    #echo -e "\n"
+    if [[ $response == y || $response == Y ]]; then
+      mkdir -p "$2"
+      if [ $? -eq 0 ]; then
+        DESTDIR="$2"
+      else
+        exit 6 #Write perms error
+      fi
+    else
+      echo -e "${clrstart}Closing.${clrend}"; exit 3 # n/wrong response
+    fi
+  else
+    DESTDIR="$2"
+  fi
+
+  if [[ ! -z "$3" ]]; then
+    if [[ "$3" != "v" ]]; then
+      echo -e "${clrstart}Wrong argument $3 !${clrend}"
+      exit 4 #wrong arg 3
+    fi
+  fi
+
+  filename=`basename "$1"`
+
+  #echo "${filename##*.}" debug
+
+  case "${filename##*.}" in
+    tar)
+      echo -e "${clrstart}Extracting $1 to $DESTDIR: (uncompressed tar)${clrend}"
+      tar x${3}f "$1" -C "$DESTDIR"
+      ;;
+    gz)
+      echo -e "${clrstart}Extracting $1 to $DESTDIR: (gip compressed tar)${clrend}"
+      tar x${3}fz "$1" -C "$DESTDIR"
+      ;;
+    tgz)
+      echo -e "${clrstart}Extracting $1 to $DESTDIR: (gip compressed tar)${clrend}"
+      tar x${3}fz "$1" -C "$DESTDIR"
+      ;;
+    xz)
+      echo -e "${clrstart}Extracting  $1 to $DESTDIR: (gip compressed tar)${clrend}"
+      tar x${3}f -J "$1" -C "$DESTDIR"
+      ;;
+    bz2)
+      echo -e "${clrstart}Extracting $1 to $DESTDIR: (bzip compressed tar)${clrend}"
+      tar x${3}fj "$1" -C "$DESTDIR"
+      ;;
+    zip)
+      echo -e "${clrstart}Extracting $1 to $DESTDIR: (zipp compressed file)${clrend}"
+      unzip "$1" -d "$DESTDIR"
+      ;;
+    rar)
+      echo -e "${clrstart}Extracting $1 to $DESTDIR: (rar compressed file)${clrend}"
+      unrar x "$1" "$DESTDIR"
+      ;;
+    7z)
+      echo -e  "${clrstart}Extracting $1 to $DESTDIR: (7zip compressed file)${clrend}"
+      7za e "$1" -o"$DESTDIR"
+      ;;
+    *)
+      echo -e "${clrstart}Unknown archieve format!"
+      exit 5
+      ;;
+  esac
+}
+#}}}
+
+# on compress n'importe quelle archive {{{
+compress() {
+  if [[ -n "$1" ]]; then
+    FILE=$1
+    case $FILE in
+      *.tar ) shift && tar cf $FILE $* ;;
+      *.tar.bz2 ) shift && tar cjf $FILE $* ;;
+      *.tar.gz ) shift && tar czf $FILE $* ;;
+      *.tgz ) shift && tar czf $FILE $* ;;
+      *.zip ) shift && zip $FILE $* ;;
+      *.rar ) shift && rar $FILE $* ;;
+    esac
+  else
+    echo "usage: compress <foo.tar.gz> ./foo ./bar"
+  fi
+}
+#}}}
+
+# on convertit en iso {{{
+to_iso () {
+  if [[ $# == 0 || $1 == "--help" || $1 == "-h" ]]; then
+    echo -e "Converts raw, bin, cue, ccd, img, mdf, nrg cd/dvd image files to ISO image file.\nUsage: to_iso file1 file2..."
+  fi
+  for i in $*; do
+    if [[ ! -f "$i" ]]; then
+      echo "'$i' is not a valid file; jumping it"
+    else
+      echo -n "converting $i..."
+      OUT=`echo $i | cut -d '.' -f 1`
+      case $i in
+        *.raw ) bchunk -v $i $OUT.iso;; #raw=bin #*.cue #*.bin
+        *.bin|*.cue ) bin2iso $i $OUT.iso;;
+        *.ccd|*.img ) ccd2iso $i $OUT.iso;; #Clone CD images
+        *.mdf ) mdf2iso $i $OUT.iso;; #Alcohol images
+        *.nrg ) nrg2iso $i $OUT.iso;; #nero images
+        * ) echo "to_iso don't know de extension of '$i'";;
+      esac
+      if [[ $? != 0 ]]; then
+        echo -e "${R}ERROR!${W}"
+      else
+        echo -e "${G}done!${W}"
+      fi
+    fi
+  done
+}
+#}}}
+
+
+# petite calclulette #{{{
+# usage: calc <equation>
+calc() {
+  if which bc &>/dev/null; then
+    echo "scale=3; $*" | bc -l
+  else
+    awk "BEGIN { print $* }"
+  fi
+}
+#}}}
+
+## cherche fichier avec pattern dans le nom {{{
+ff() { find . -type f -iname '*'$*'*' -ls ; }
+#}}}
+
+## cherche fichier avec pattern dans le nom $1 et on execute $2 dessus {{{
+fe() { find . -type f -iname '*'$1'*' -exec "${2:-file}" {} \;  ; }
+#}}}
+
+## on passe en minuscule {{{
+lowercase() {
+  for file ; do
+    filename=${file##*/}
+    case "$filename" in
+      */* ) dirname==${file%/*} ;;
+      * ) dirname=.;;
+    esac
+    nf=$(echo $filename | tr A-Z a-z)
+    newname="${dirname}/${nf}"
+    if [[ "$nf" != "$filename" ]]; then
+      mv "$file" "$newname"
+      echo "lowercase: $file --> $newname"
+    else
+      echo "lowercase: $file not changed."
+    fi
+  done
+}
+#}}}
+
+## on change 2 nom de fichiers {{{
+swap() {
+  local TMPFILE=tmp.$$
+
+  [[ $# -ne 2 ]] && echo "swap: 2 arguments needed" && return 1
+  [[ ! -e $1 ]] && echo "swap: $1 does not exist" && return 1
+  [[ ! -e $2 ]] && echo "swap: $2 does not exist" && return 1
+
+  mv "$1" $TMPFILE
+  mv "$2" "$1"
+  mv $TMPFILE "$2"
+}
+#}}}
+
+## on cherche les tailles des repos et on les liste{{{
+dirsize () {
+  du -shx * .[a-zA-Z0-9_]* 2> /dev/null | egrep '^ *[0-9.]*[MG]' | sort -n > /tmp/list
+  egrep '^ *[0-9.]*M' /tmp/list
+  egrep '^ *[0-9.]*G' /tmp/list
+  rm -rf /tmp/list
+}
+#}}}
+
+# on rentre un repo et on ls {{{
+function cd() { builtin cd -- "$@" && { [ "$PS1" = "" ] || ls -hrt --color; }; }
+#}}}
+
+# SYSTEMD SUPPORT {{{
+if which systemctl &>/dev/null; then
+  start() {
+    sudo systemctl start $1.service
+  }
+  restart() {
+    sudo systemctl restart $1.service
+  }
+  stop() {
+    sudo systemctl stop $1.service
+  }
+  enable() {
+    sudo systemctl enable $1.service
+  }
+  status() {
+    sudo systemctl status $1.service
+  }
+  disable() {
+    sudo systemctl disable $1.service
+  }
+fi
+#}}}
+
+# on créé un rep et on y va{{{
+mkcd() {
+  if [ $# != 1 ]; then
+    echo "Usage: mkcd <dir>"
+  else
+    mkdir -p $1 && cd $1
+  fi
+}
+#}}}
+#}}}
+vim()
+{
+  # osx users, use stty -g
+  local STTYOPTS="$(stty --save)"
+  stty stop '' -ixoff
+  command vim "$@"
+  stty "$STTYOPTS"
+}
