@@ -42,8 +42,8 @@ fi
 #}}}
 
 # LS {{{
-alias ls='ls -hF --color=auto'
-alias l='ls -hF --color=auto'
+alias ls='ls -h --color=auto'
+alias l='ls -h --color=auto'
 alias lrt='ls -lrt'                    
 alias ll='ls -alh'
 alias la='ll -A'
