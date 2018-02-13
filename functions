@@ -217,10 +217,6 @@ dirsize () {
 }
 #}}}
 
-# on rentre un repo et on ls {{{
-function cd() { builtin cd -- "$@" && { [ "$PS1" = "" ] || ls -hrt --color; }; }
-#}}}
-
 # SYSTEMD SUPPORT {{{
 if which systemctl &>/dev/null; then
   start() {
